@@ -1,0 +1,25 @@
+# Model checkpoints and weights
+models/
+
+# SAM mask selections
+sam_mask/select_masks/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Image output logs
+image_log/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
