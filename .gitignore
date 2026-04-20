@@ -3,6 +3,7 @@ models/
 
 # SAM mask selections
 sam_mask/select_masks/
+sam_mask/batch_masks/
 
 # Python cache
 __pycache__/
@@ -12,6 +13,10 @@ __pycache__/
 
 # Image output logs
 image_log/
+
+# Results
+results/
+
 
 # IDE and editor files
 .vscode/

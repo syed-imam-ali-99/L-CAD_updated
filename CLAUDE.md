@@ -13,6 +13,31 @@ L-CAD (Language-based Colorization with Any-level Descriptions using Diffusion P
 - NVIDIA GPU + CUDA cuDNN required
 - Install dependencies: `pip install -r requirements.txt`
 
+**Quick Setup:**
+```bash
+./scripts/setup.sh
+```
+This automated setup script will install dependencies, create config.yaml, and prepare necessary directories. See `scripts/README.md` for details.
+
+## Configuration System
+
+**IMPORTANT**: The codebase has been refactored to use a centralized configuration system.
+
+All file paths and hyperparameters are now managed through `config.yaml`:
+1. **First-time setup**: Copy `config.yaml.example` to `config.yaml`
+2. **Update paths**: Edit `config.yaml` to match your environment (dataset locations, model checkpoints)
+3. **Access in code**: Import `cfg` from `config.py` to access configuration values
+
+Key configuration sections:
+- `models`: Model checkpoint paths (init_model, resume_checkpoint, largedecoder_checkpoint)
+- `datasets`: Dataset directories (COCO, example images, SAM masks)
+- `training`: Training hyperparameters (n_gpu, batch_size, learning_rate)
+- `testing`: Test/inference settings
+- `inference`: DDIM sampling parameters
+- `output`: Output directory templates
+
+The `config.yaml` file is gitignored to prevent committing environment-specific paths.
+
 ## Architecture
 
 ### Core Components
@@ -53,88 +78,138 @@ The system operates in LAB color space:
 
 ## Common Commands
 
+**NOTE:** All commands can be run using convenient bash scripts in the `scripts/` directory. See `scripts/README.md` for full documentation.
+
 ### Inference
 
 **Basic inference with language prompts:**
 ```bash
-python colorization_main.py
+./scripts/inference_basic.sh
+# or: python colorization_main.py -m
 ```
 
 **Instance-aware inference with SAM masks:**
 ```bash
-python inference.py
+./scripts/inference.sh
+# or: python inference.py
 ```
 
 The inference script:
-- **Note**: Line 35 has hardcoded path `/data/swarnim/L-CAD/models/largedecoder-checkpoint.pth` - update this to match your setup
-- Processes images from `example/` directory
-- Uses test pairs from `example/test-pair.json` or `sam_mask/pairs.json`
-- Outputs to `./image_log/test_YYYY-MM-DD-HH-MM-SS/`
+- Loads model checkpoint from `cfg.largedecoder_checkpoint` (configured in `config.yaml`)
+- Processes images from `cfg.example_img_dir` directory
+- Uses test pairs from `cfg.sam_pairs_json` or `cfg.example_test_pairs`
+- Outputs to directory specified by `cfg.test_output_template` with timestamp
 
 ### Training
 
 **Start training:**
 ```bash
-python colorization_main.py -t
+./scripts/train.sh
+# or: python colorization_main.py -t
 ```
 
 **Resume training:**
 ```bash
-python colorization_main.py -t -r
+./scripts/train_resume.sh
+# or: python colorization_main.py -t -r
 ```
 
-Training configuration (hardcoded in `colorization_main.py:66-74`):
-- Requires init model: `models/init_model.ckpt`
-- Default: 2 GPUs, batch_size=16, lr=1e-5 per GPU
-- Dataset: Extended COCO-Stuff from `/data/cz-data/coco/`
-- Annotations: `resources/coco/caption_train.json`
+Training configuration (loaded from `config.yaml`):
+- Init model path: `cfg.init_model_path`
+- GPU count: `cfg.n_gpu` (default: 2)
+- Batch size: `cfg.batch_size` (default: 16)
+- Learning rate: `cfg.learning_rate_multiplier * n_gpu` (default: 1e-5 per GPU)
+- Dataset: Extended COCO-Stuff from `cfg.coco_img_dir`
+- Annotations: `cfg.coco_caption_dir/caption_train.json`
 
 ### Testing Modes
 
-**Multi-instance colorization without SAM:**
+**Validation on COCO val set:**
 ```bash
-python colorization_main.py -m
+./scripts/validate.sh
+# or: python colorization_main.py
 ```
 
 **Multi-instance with SAM masks:**
 ```bash
-python colorization_main.py -m -s
+./scripts/test_multicolor_sam.sh
+# or: python colorization_main.py -m -s
 ```
-
-**Validation:**
-```bash
-python colorization_main.py
-```
-(No flags runs validation on COCO val set)
 
 ## Model Weights
 
-Models should be placed in `./models/`:
-- `init_model.ckpt`: Pre-trained initialization for training
-- `auto_weight.ckpt`: Default test model
-- `largedecoder-checkpoint.pth`: Used by `inference.py`
+Model checkpoint paths are configured in `config.yaml` under the `models` section:
+- `init_model`: Pre-trained initialization for training (default: `models/init_model.ckpt`)
+- `resume_checkpoint`: Default test model (default: `models/auto_weight.ckpt`)
+- `largedecoder_checkpoint`: Used by `inference.py` (must be set to your environment)
 
 Download links in README.md (Baidu Pan and Google Drive)
 
 ## Key Implementation Details
 
-### SAM Mask Generation (Pre-processing Stage)
+### SAM Mask Generation
+
+#### Traditional Approach (Pre-processing Stage)
 
 **Important**: SAM masks must be generated BEFORE running inference. They are NOT created on-the-fly.
 
 To generate SAM masks for new images:
+```bash
+./scripts/generate_sam_masks.sh
+```
+
+**Manual steps:**
 1. Edit `sam_mask/make_mask.py` to add your image filenames to the `img_list` (line 7-14)
 2. Ensure SAM model checkpoint exists: `models/sam_vit_h_4b8939.pth`
-3. Run the mask generation script:
-```bash
-cd sam_mask
-python make_mask.py
-```
-4. Masks will be saved to `sam_mask/masks/` and visualizations to `sam_mask/seg_img/`
-5. Manually select relevant masks and copy them to `sam_mask/select_masks/{image_name}/`
+3. Run the generation script (shown above)
+4. Review masks in `sam_mask/seg_img/` and select relevant ones
+5. Copy selected masks to `sam_mask/select_masks/{image_name}/`
 6. Create corresponding test pairs in `sam_mask/pairs.json` matching format: `[["image.jpg", "desc1, desc2, desc3"], ...]`
 
 **Workflow**: The script loads SAM model once per image and generates ALL masks at once using `SamAutomaticMaskGenerator`. Each image gets multiple instance masks saved as individual `.npy` files.
+
+#### Batch-Based Approach (NEW - Recommended for Large Datasets)
+
+**NEW**: For processing many images with limited storage, use the batch-based pipeline that generates masks on-the-fly and automatically cleans them up.
+
+**Quick Start:**
+```bash
+# Process images in batches of 100 (default)
+./scripts/run_batch_inference.sh
+
+# Or with custom batch size
+python batch_inference.py --batch_size 100
+```
+
+**Key Features:**
+- Processes images in batches (default: 100 images per batch)
+- Generates SAM masks automatically for each batch
+- Runs colorization inference immediately after mask generation
+- Automatically deletes masks after each batch to free storage
+- At any time, only masks for current batch exist on disk (~90% storage reduction)
+
+**When to Use:**
+- ✅ Processing many images (>100)
+- ✅ Limited storage available
+- ✅ Automated end-to-end processing
+- ✅ Masks don't need to be reused
+
+**Documentation:**
+- Full guide: `BATCH_INFERENCE_README.md`
+- Quick start: `BATCH_QUICKSTART.md`
+
+**Pipeline Flow:**
+```
+For each batch:
+  1. Generate SAM masks for 100 images → temp storage
+  2. Run colorization inference → save results
+  3. Delete SAM masks → free storage
+  4. Repeat for next batch
+```
+
+**Storage Comparison:**
+- Traditional: ~2.5 GB for 1000 images (all masks stored)
+- Batch-based: ~250 MB peak usage (only current batch)
 
 ### Instance-Aware Sampling
 
@@ -189,16 +264,19 @@ The grayscale encoder (`g_encoder`) in AutoencoderKL:
 2. Current: `ldm.modules.encoders.modules.FrozenCLIPEmbedder`
 
 **To adjust sampling parameters:**
-Edit in `inference.py:49-51` or `colorization_main.py`:
+Edit in `config.yaml` under the `inference` section:
 - `ddim_steps`: Number of denoising steps (50 default)
 - `ddim_eta`: Stochasticity (0.0 = deterministic)
 - `unconditional_guidance_scale`: Classifier-free guidance strength (5.0 default)
+- `use_attn_guidance`: Enable/disable attention guidance (true default)
 
 ## Common Issues and Troubleshooting
 
-**Hardcoded paths in inference.py:**
-- Line 35: Update `resume_path` to point to your model checkpoint location
-- The script references `/data/swarnim/L-CAD/models/` which may not exist on your system
+**Configuration issues:**
+- If `config.yaml` is missing, copy from `config.yaml.example`
+- Update all paths in `config.yaml` to match your environment before running
+- Model checkpoint paths under `models` section
+- Dataset paths under `datasets` section
 
 **SAM mask errors:**
 - Ensure masks are pre-generated before running inference with `-s` flag
@@ -207,10 +285,7 @@ Edit in `inference.py:49-51` or `colorization_main.py`:
 - Masks must be in `sam_mask/select_masks/{image_name}/` directory structure
 
 **Memory issues:**
-- Reduce `batch_size` in training (currently 16 on line 70 of colorization_main.py)
+- Reduce `batch_size` in `config.yaml` under `training` section (default: 16)
 - Use `use_checkpoint=True` in model config for gradient checkpointing
-- Training requires 2 GPUs by default; adjust `n_gpu` on line 67 if needed
-
-**Dataset path issues:**
-- Training expects COCO dataset at `/data/cz-data/coco/` (line 83)
-- Update hardcoded paths in `colorization_main.py` to match your data location
+- Adjust `n_gpu` in `config.yaml` under `training` section (default: 2)
+- Enable memory saving: set `memory.save_memory: true` in `config.yaml`

@@ -7,6 +7,7 @@ from cldm.model import create_model, load_state_dict
 import time
 import torch
 from share import *
+from config import cfg
 
 
 
@@ -63,55 +64,55 @@ def get_parser(**parser_kwargs):
 if __name__ == "__main__":
     args,_ = get_parser()
 
-    if args.train:  
-        n_gpu = 2
-        init_model_path = 'models/init_model.ckpt'
+    if args.train:
+        n_gpu = cfg.n_gpu
+        init_model_path = cfg.init_model_path
 
-        batch_size = 16
-        logger_freq = 1000
-        learning_rate = 1e-5 * n_gpu
-        sd_locked = False # 
-        only_mid_control = False
+        batch_size = cfg.batch_size
+        logger_freq = cfg.logger_freq
+        learning_rate = cfg.learning_rate_multiplier * n_gpu
+        sd_locked = cfg.sd_locked
+        only_mid_control = cfg.only_mid_control
 
-        model = create_model('configs/cldm_v15_ehdecoder.yaml').cpu()
+        model = create_model(cfg.cldm_v15_config).cpu()
 
         model.load_state_dict(load_state_dict(init_model_path, location='cpu'))
         model.learning_rate = learning_rate
         model.sd_locked = sd_locked
         model.only_mid_control = only_mid_control
 
-        dataset = MyDataset(img_dir="/data/cz-data/coco/",caption_dir='resources/coco') 
+        dataset = MyDataset(img_dir=cfg.coco_img_dir, caption_dir=cfg.coco_caption_dir)
 
-        dataloader = DataLoader(dataset, num_workers=0, batch_size=batch_size, shuffle=True)
+        dataloader = DataLoader(dataset, num_workers=cfg.num_workers, batch_size=batch_size, shuffle=True)
         logger = ImageLogger(batch_frequency=logger_freq)
-        trainer = pl.Trainer(gpus=n_gpu, precision=32, callbacks=[logger])
+        trainer = pl.Trainer(gpus=n_gpu, precision=cfg.precision, callbacks=[logger])
         # Train!
         trainer.fit(model, dataloader)
 
     else: # test or val
-    
-        resume_path='./models/auto_weight.ckpt'
 
-        batch_size = 1 
+        resume_path = cfg.resume_checkpoint
 
-        model = create_model('configs/cldm_v15_ehdecoder.yaml').cpu()
+        batch_size = cfg.test_batch_size
+
+        model = create_model(cfg.cldm_v15_config).cpu()
         model.load_state_dict(load_state_dict(resume_path, location='cpu'))
-    
-        trainer = pl.Trainer(gpus=1, precision=32)
+
+        trainer = pl.Trainer(gpus=cfg.test_n_gpu, precision=cfg.test_precision)
         if args.multicolor: # test demo
             if args.usesam: # -m -s
                 model.usesam = True
-                dataset = MyDataset(img_dir='example', caption_dir='sam_mask', split='test',use_sam=True) 
-                dataloader = DataLoader(dataset, num_workers=0, batch_size=batch_size, shuffle=False)
+                dataset = MyDataset(img_dir=cfg.example_img_dir, caption_dir=cfg.sam_caption_dir, split='test', use_sam=True)
+                dataloader = DataLoader(dataset, num_workers=cfg.test_num_workers, batch_size=batch_size, shuffle=False)
                 trainer.test(model, dataloader)
             else: # -m
                 model.usesam = False
-                dataset = MyDataset(img_dir='example', caption_dir='example', split='test') 
-                dataloader = DataLoader(dataset, num_workers=0, batch_size=batch_size, shuffle=False)
+                dataset = MyDataset(img_dir=cfg.example_img_dir, caption_dir=cfg.example_caption_dir, split='test')
+                dataloader = DataLoader(dataset, num_workers=cfg.test_num_workers, batch_size=batch_size, shuffle=False)
                 trainer.test(model, dataloader)
         else: # val
             model.usesam = False
-            dataset = MyDataset(img_dir="/data/cz-data/coco/", caption_dir='resources/coco', split='val') # 
-            dataloader = DataLoader(dataset, num_workers=0, batch_size=batch_size, shuffle=False)
+            dataset = MyDataset(img_dir=cfg.coco_img_dir, caption_dir=cfg.coco_caption_dir, split='val')
+            dataloader = DataLoader(dataset, num_workers=cfg.test_num_workers, batch_size=batch_size, shuffle=False)
             trainer.test(model, dataloader)
 
