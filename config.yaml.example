@@ -1,0 +1,113 @@
+# L-CAD Configuration File Example
+# Copy this file to config.yaml and update the paths according to your setup
+
+# Model paths
+models:
+  # Path to the initial model checkpoint for training
+  init_model: "models/init_model.ckpt"
+
+  # Path to the resume checkpoint for validation/testing
+  resume_checkpoint: "models/auto_weight.ckpt"
+
+  # Path to the large decoder checkpoint for inference
+  # UPDATE THIS PATH to match your environment
+  largedecoder_checkpoint: "/path/to/your/models/largedecoder-checkpoint.pth"
+
+# Config files
+configs:
+  # Path to CLDM v15 encoder-decoder config
+  cldm_v15: "configs/cldm_v15_ehdecoder.yaml"
+
+  # Path to CLDM sample config
+  cldm_sample: "configs/cldm_sample.yaml"
+
+# Dataset paths
+datasets:
+  # Training/validation dataset (COCO)
+  coco:
+    # UPDATE THIS PATH to your COCO dataset location
+    img_dir: "/path/to/your/coco/"
+    caption_dir: "resources/coco"
+
+  # Test/example dataset
+  example:
+    img_dir: "example"
+    caption_dir: "example"
+    test_pairs: "example/test-pair.json"
+
+  # SAM mask paths
+  sam:
+    caption_dir: "sam_mask"
+    pairs_json: "sam_mask/pairs.json"
+    select_masks_dir: "sam_mask/select_masks"
+
+# Training hyperparameters
+training:
+  # Number of GPUs for training
+  n_gpu: 2
+
+  # Batch size for training
+  batch_size: 16
+
+  # How often to log images during training
+  logger_freq: 1000
+
+  # Learning rate multiplier (will be multiplied by n_gpu)
+  learning_rate_multiplier: 1e-5
+
+  # Whether to lock the stable diffusion model during training
+  sd_locked: false
+
+  # Whether to use only mid control
+  only_mid_control: false
+
+  # Number of dataloader workers
+  num_workers: 0
+
+  # Training precision (16 or 32)
+  precision: 32
+
+# Validation/Testing hyperparameters
+testing:
+  batch_size: 1
+  num_workers: 0
+  precision: 32
+  n_gpu: 1
+
+# Inference hyperparameters
+inference:
+  # Number of DDIM sampling steps
+  ddim_steps: 50
+
+  # DDIM eta parameter (0.0 = deterministic)
+  ddim_eta: 0.0
+
+  # Unconditional guidance scale (higher = more adherence to prompt)
+  unconditional_guidance_scale: 5.0
+
+  # Whether to use attention guidance
+  use_attn_guidance: true
+
+# Dataset settings
+dataset:
+  # Image size for training/inference
+  img_size: 256
+
+  # Normalization mean for RGB channels
+  norm_mean: [0.5, 0.5, 0.5]
+
+  # Normalization std for RGB channels
+  norm_std: [0.5, 0.5, 0.5]
+
+# Output paths
+output:
+  # Base directory for image logs
+  image_log_dir: "./image_log"
+
+  # Template for test output directory (use {timestamp} placeholder)
+  test_output_template: "./image_log/test_{timestamp}"
+
+# Memory optimization
+memory:
+  # Enable memory saving features (e.g., sliced attention)
+  save_memory: false

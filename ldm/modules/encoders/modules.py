@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.utils.checkpoint import checkpoint
+from pathlib import Path
 
 from transformers import T5Tokenizer, T5EncoderModel, CLIPTokenizer, CLIPTextModel
 
@@ -96,8 +97,9 @@ class FrozenCLIPEmbedder(AbstractEncoder):
                  freeze=True, layer="last", layer_idx=None):  # clip-vit-base-patch32 "openai/clip-vit-large-patch14"
         super().__init__()
         assert layer in self.LAYERS
-        self.tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
-        self.transformer = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14")
+        clip_version = self._resolve_clip_version(version)
+        self.tokenizer = CLIPTokenizer.from_pretrained(clip_version)
+        self.transformer = CLIPTextModel.from_pretrained(clip_version)
         self.device = device
         self.max_length = max_length
         if freeze:
@@ -107,6 +109,21 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         if layer == "hidden":
             assert layer_idx is not None
             assert 0 <= abs(layer_idx) <= 12
+
+    @staticmethod
+    def _resolve_clip_version(version):
+        if version and Path(version).exists():
+            return version
+
+        model_id = "openai/clip-vit-large-patch14"
+        cache_root = Path.home() / ".cache" / "huggingface" / "hub" / "models--openai--clip-vit-large-patch14"
+        ref_path = cache_root / "refs" / "main"
+        if ref_path.exists():
+            snapshot = cache_root / "snapshots" / ref_path.read_text().strip()
+            if snapshot.exists():
+                return str(snapshot)
+
+        return model_id
 
     def freeze(self):
         self.transformer = self.transformer.eval()
@@ -209,5 +226,4 @@ class FrozenCLIPT5Encoder(AbstractEncoder):
         clip_z = self.clip_encoder.encode(text)
         t5_z = self.t5_encoder.encode(text)
         return [clip_z, t5_z]
-
 

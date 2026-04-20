@@ -10,6 +10,7 @@ from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 
 from einops import rearrange
+from config import cfg
 
 
 class MyDataset(Dataset):
@@ -44,11 +45,11 @@ class MyDataset(Dataset):
 
         elif split == 'test':
             self.istest = True
-            self.img_dir = 'example'
-            if self.use_sam: 
-                caption_path = os.path.join('sam_mask','pairs.json')
-            else:    
-                caption_path = os.path.join('example','test-pair.json')
+            self.img_dir = cfg.example_img_dir
+            if self.use_sam:
+                caption_path = cfg.sam_pairs_json
+            else:
+                caption_path = cfg.example_test_pairs
 
                 
             self.transform = transforms.Compose([# CenterCropLongEdge(),
@@ -83,9 +84,9 @@ class MyDataset(Dataset):
         return cap,index
 
     def get_mask(self, img_name):
-        mask_dir = 'sam_mask/select_masks'
+        mask_dir = cfg.sam_select_masks_dir
         mask_list = []
-        mask_path = os.path.join(mask_dir,img_name.split('.')[0])
+        mask_path = os.path.join(mask_dir, img_name.split('.')[0])
         for mask_name in sorted(os.listdir(mask_path)):
             mask = np.load(os.path.join(mask_path, mask_name))
             mask = mask.astype('float')

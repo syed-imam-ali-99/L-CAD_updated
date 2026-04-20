@@ -1,0 +1,72 @@
+# L-CAD Configuration File
+# All file paths and hyperparameters are configured here
+
+# Model paths
+models:
+  init_model: "models/init_model.ckpt"
+  resume_checkpoint: "models/auto_weight.ckpt"
+  largedecoder_checkpoint: "/data/swarnim/L-CAD/models/largedecoder-checkpoint.pth"
+
+# Config files
+configs:
+  cldm_v15: "configs/cldm_v15_ehdecoder.yaml"
+  cldm_sample: "configs/cldm_sample.yaml"
+
+# Dataset paths
+datasets:
+  # Training/validation dataset
+  coco:
+    img_dir: "/data/cz-data/coco/"
+    caption_dir: "resources/coco"
+
+  # Test/example dataset
+  example:
+    img_dir: "example"
+    caption_dir: "example"
+    test_pairs: "example/test-pair.json"
+
+  # SAM mask paths
+  sam:
+    caption_dir: "sam_mask"
+    pairs_json: "sam_mask/pairs.json"
+    select_masks_dir: "sam_mask/select_masks"
+
+# Training hyperparameters
+training:
+  n_gpu: 2
+  batch_size: 16
+  logger_freq: 1000
+  learning_rate_multiplier: 1e-5  # Will be multiplied by n_gpu
+  sd_locked: false
+  only_mid_control: false
+  num_workers: 0
+  precision: 32
+
+# Validation/Testing hyperparameters
+testing:
+  batch_size: 1
+  num_workers: 0
+  precision: 32
+  n_gpu: 1
+
+# Inference hyperparameters
+inference:
+  ddim_steps: 50
+  ddim_eta: 0.0
+  unconditional_guidance_scale: 5.0
+  use_attn_guidance: true
+
+# Dataset settings
+dataset:
+  img_size: 256
+  norm_mean: [0.5, 0.5, 0.5]
+  norm_std: [0.5, 0.5, 0.5]
+
+# Output paths
+output:
+  image_log_dir: "./image_log"
+  test_output_template: "./image_log/test_{timestamp}"
+
+# Memory optimization
+memory:
+  save_memory: false

@@ -12,6 +12,7 @@ from ldm.ptp import ptp_SD, ptp_utils
 from ldm.models.diffusion.ddim import DDIMSampler,DDIMSampler_withsam
 from PIL import Image
 import numpy as np
+from config import cfg
 
 start_time = time.strftime('%Y-%m-%d-%H-%M-%S')
 
@@ -32,24 +33,24 @@ def save_images(samples, batch, save_root, prefix='', name_prompt=False):
 
 if __name__ == "__main__":
 
-    resume_path = '/data/swarnim/L-CAD/models/largedecoder-checkpoint.pth'
+    resume_path = cfg.largedecoder_checkpoint
 
-    batch_size = 1 
+    batch_size = cfg.test_batch_size
 
-    model = create_model('configs/cldm_sample.yaml').cpu()
+    model = create_model(cfg.cldm_sample_config).cpu()
 
     model.load_state_dict(load_state_dict(resume_path, location='cpu'))
     model = model.cuda()
 
     model.usesam = True
-    dataset = MyDataset(img_dir='example', caption_dir='example', split='test',use_sam=True) 
-    dataloader = DataLoader(dataset, num_workers=0, batch_size=batch_size, shuffle=False)
+    dataset = MyDataset(img_dir=cfg.example_img_dir, caption_dir=cfg.example_caption_dir, split='test', use_sam=True)
+    dataloader = DataLoader(dataset, num_workers=cfg.test_num_workers, batch_size=batch_size, shuffle=False)
     for batch_idx, batch in enumerate(dataloader):
         multiColor_test = True
-        ddim_steps=50
-        ddim_eta=0.0
-        unconditional_guidance_scale = 5.0
-        save_root = './image_log/test_%s'%start_time
+        ddim_steps = cfg.ddim_steps
+        ddim_eta = cfg.ddim_eta
+        unconditional_guidance_scale = cfg.unconditional_guidance_scale
+        save_root = cfg.test_output_template.format(timestamp=start_time)
         use_ddim = ddim_steps is not None
 
         control = batch[model.control_key] 
@@ -86,7 +87,7 @@ if __name__ == "__main__":
         shape = (model.channels, h // 8, w // 8)
         samples_cfg, intermediates = ddim_sampler.sample(ddim_steps, b, shape, cond, eta=ddim_eta,
                                             unconditional_guidance_scale=unconditional_guidance_scale, unconditional_conditioning=uc_full,verbose=False,
-                                            use_attn_guidance=True, # 使用attn_guidance
+                                            use_attn_guidance=cfg.use_attn_guidance,
                                             sam_mask=sam_mask, split_id=split_idx,tokens=tokens
                                             )
         
